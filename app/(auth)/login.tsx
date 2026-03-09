@@ -92,6 +92,13 @@ export default function LoginScreen() {
             <Text style={styles.buttonText}>INICIAR SESIÓN</Text>
           )}
         </TouchableOpacity>
+
+             <Link href="/(auth)/forgot-password" asChild>
+          <TouchableOpacity style={styles.forgotPasswordContainer}>
+            <Text style={styles.forgotPasswordText}>¿Olvidaste tu contraseña?</Text>
+          </TouchableOpacity>
+        </Link>
+      
       </View>
 
       <View style={styles.footer}>
@@ -101,6 +108,8 @@ export default function LoginScreen() {
             <Text style={styles.linkText}> Regístrate aquí</Text>
           </TouchableOpacity>
         </Link>
+
+   
       </View>
     </View>
   );
@@ -122,4 +131,13 @@ const styles = StyleSheet.create({
   footer: { flexDirection: 'row', justifyContent: 'center', marginTop: 40 },
   footerText: { fontSize: 15 },
   linkText: { fontSize: 15, color: '#007AFF', fontWeight: '700' },
+forgotPasswordContainer: {
+    marginTop: 20,     
+    alignItems: 'center',
+  },
+  forgotPasswordText: {
+    fontSize: 15,
+    color: '#007AFF',
+    fontWeight: '600',
+  },
 });
