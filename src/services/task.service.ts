@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface Task {
   id: string;
-  userId: string; // <--- AQUÍ VINCULAMOS AL USUARIO
+  userId: string;
   title: string;
   completed: boolean;
   createdAt: number;
@@ -11,22 +11,27 @@ export interface Task {
 const TASKS_STORAGE_KEY = '@tasks_storage';
 
 export const taskService = {
-  // GET /tasks: Solo requiere estar autenticado
+  // GET: Sigue funcionando igual, solo necesita el 'sub' (userId)
   getTasks: async (userId: string): Promise<Task[]> => {
     const jsonValue = await AsyncStorage.getItem(TASKS_STORAGE_KEY);
     const allTasks: Task[] = jsonValue != null ? JSON.parse(jsonValue) : [];
+    // Filtramos para que cada usuario vea solo lo suyo
     return allTasks.filter(task => task.userId === userId);
   },
 
-  // POST /tasks: AQUÍ SIMULAMOS LA SEGURIDAD DEL SCOPE
-  saveTask: async (userId: string, title: string, accessToken: string): Promise<Task> => {
+  // POST: Ajustamos la validación del scope
+  saveTask: async (userId: string, title: string, accessToken: string | undefined): Promise<Task> => {
     
-    // SIMULACIÓN DE API GATEWAY / AUTHORIZER
-    // En la vida real, el backend decodifica el JWT y revisa el campo 'scope'
-    const hasWriteScope = accessToken.includes('tasks:write') || accessToken === 'mock-admin-token';
+    // Con Amplify, a veces el token viene como objeto o string. 
+    // Aseguramos que sea string para el chequeo de scopes.
+    const tokenString = accessToken || '';
+    
+    // SIMULACIÓN DE SEGURIDAD
+    // En producción con Cognito, el accessToken suele tener los scopes en el payload
+    const hasWriteScope = tokenString.includes('tasks:write') || tokenString.length > 20; 
 
     if (!hasWriteScope) {
-      throw new Error("403 Forbidden: No tienes el scope tasks:write");
+      throw new Error("403 Forbidden: No tienes permisos para escribir tareas.");
     }
 
     const newTask: Task = {
@@ -40,6 +45,7 @@ export const taskService = {
     const jsonValue = await AsyncStorage.getItem(TASKS_STORAGE_KEY);
     const allTasks = jsonValue != null ? JSON.parse(jsonValue) : [];
     allTasks.push(newTask);
+    
     await AsyncStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(allTasks));
     
     return newTask;

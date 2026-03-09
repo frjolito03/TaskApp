@@ -12,41 +12,34 @@ export default function TasksScreen() {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   
-  // Fuente de verdad del contexto
-  const { user, canCreate } = useAuth(); 
+  // Ahora usamos userAttributes. El "user" viejo ya no es necesario aquí.
+  const { userAttributes, isAuthenticated } = useAuth(); 
 
-const loadData = useCallback(async () => {
-  if (!user) return;
+  const loadData = useCallback(async () => {
+    // Si no está autenticado o no hay atributos, no intentamos cargar
+    if (!isAuthenticated || !userAttributes) {
+      setLoading(false);
+      return;
+    }
 
-  setLoading(true);
-  try {
-    user.getSession(async (err: any, session: any) => {
-      if (err || !session || !session.isValid()) {
-        console.log("⚠️ Sesión no lista para cargar datos");
-        setLoading(false);
-        return; 
-      }
+    setLoading(true);
+    try {
+      // 1. MANIOBRA SENIOR: Usamos el 'sub' (ID único de AWS) directamente desde el contexto
+      const userId = userAttributes.sub; 
 
-      try {
-        // EXTRA: Obtenemos el ID real del token para mayor seguridad en la prueba
-        const payload = session.getIdToken().decodePayload();
-        const userId = payload.sub; // Este es el UUID único de AWS
-
-        console.log("Cargando tareas para el usuario:", userId);
+      if (userId) {
+        console.log("✅ Cargando tareas para el UUID:", userId);
         
-        // Usamos el userId (sub) en lugar de getUsername si tu API así lo requiere
+        // Llamada limpia al servicio sin callbacks anidados
         const data = await taskService.getTasks(userId); 
         setTasks(data);
-      } catch (error) {
-        console.error("Error al obtener tareas:", error);
-      } finally {
-        setLoading(false);
       }
-    });
-  } catch (error) {
-    setLoading(false);
-  }
-}, [user]);
+    } catch (error) {
+      console.error("❌ Error al obtener tareas:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [userAttributes, isAuthenticated]);
 
   // Ejecución inicial
   useEffect(() => {
@@ -59,7 +52,7 @@ const loadData = useCallback(async () => {
         <Text style={[styles.taskText, item.completed && styles.completedText]}>
           {item.title}
         </Text>
-        <Text style={styles.userIdTag}>ID: {item.userId.slice(0, 8)}...</Text>
+        <Text style={styles.userIdTag}>ID Usuario: {item.userId.slice(0, 8)}...</Text>
       </View>
       {item.completed && (
         <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
@@ -80,11 +73,15 @@ const loadData = useCallback(async () => {
           renderItem={renderTask}
           ListEmptyComponent={<Text style={styles.emptyText}>No tienes tareas aún.</Text>}
           contentContainerStyle={styles.listContent}
+          // Agregamos un refresco manual por si acaso
+          onRefresh={loadData}
+          refreshing={loading}
         />
       )}
 
-      {/* Acción de creación basada en permisos del contexto */}
-      {canCreate && (
+      {/* El botón flotante ahora siempre visible si estás logueado, 
+          o puedes usar una lógica de roles si la tienes */}
+      {isAuthenticated && (
         <TouchableOpacity 
           style={styles.fab} 
           onPress={() => router.push('/modal')} 
