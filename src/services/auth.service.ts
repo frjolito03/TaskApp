@@ -5,32 +5,16 @@ import {
   CognitoUserPool,
   CognitoUserSession
 } from 'amazon-cognito-identity-js';
-import * as SecureStore from 'expo-secure-store';
 
 // 1. USA ASYNCSTORAGE PARA COGNITO (Es más compatible con el SDK síncrono)
 // SecureStore es excelente para el refresh_token manual, pero para los 
 // datos internos de Cognito, AsyncStorage evita el "bucle de sesión vacía".
 
-const CognitoStorage = {
-  setItem: (key: string, value: string) => {
-    AsyncStorage.setItem(key, value);
-  },
-  getItem: (key: string) => {
-    // Cognito maneja la promesa internamente si el objeto tiene esta estructura
-    return AsyncStorage.getItem(key);
-  },
-  removeItem: (key: string) => {
-    AsyncStorage.removeItem(key);
-  },
-  clear: () => {
-    AsyncStorage.clear();
-  },
-};
 
 const poolData = { 
   UserPoolId: process.env.EXPO_PUBLIC_COGNITO_USER_POOL_ID || '',
   ClientId: process.env.EXPO_PUBLIC_COGNITO_CLIENT_ID || '',
-  Storage: CognitoStorage as any, // El 'as any' es necesario para saltar la validación estricta de TS
+  Storage: AsyncStorage as any, // El 'as any' es necesario para saltar la validación estricta de TS
 };
 
 export const userPool = new CognitoUserPool(poolData);
@@ -53,7 +37,7 @@ export const authService = {
       cognitoUser.authenticateUser(authDetails, {
         onSuccess: async (session) => {
           // Guardamos el refresh token en SecureStore por seguridad extra
-          await SecureStore.setItemAsync('refresh_token', session.getRefreshToken().getToken());
+          await AsyncStorage.setItem('refresh_token', session.getRefreshToken().getToken());
           resolve(session);
         },
         onFailure: (err) => {
@@ -75,7 +59,7 @@ export const authService = {
         user.signOut();
       }
       // Limpiamos AMBOS para estar seguros
-      await SecureStore.deleteItemAsync('refresh_token');
+      await AsyncStorage.removeItem('refresh_token');
       const keys = await AsyncStorage.getAllKeys();
       const cognitoKeys = keys.filter(key => key.includes('CognitoIdentityServiceProvider'));
       await AsyncStorage.multiRemove(cognitoKeys);

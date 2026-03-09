@@ -1,6 +1,7 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
-    CognitoUser,
-    CognitoUserSession
+  CognitoUser,
+  CognitoUserSession
 } from 'amazon-cognito-identity-js';
 import { router } from 'expo-router';
 import React, { createContext, useContext, useEffect, useState } from 'react';
@@ -12,6 +13,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   user: CognitoUser | null;
+  userAttributes: any;
   permissions: string[];
   canCreate: boolean; 
   signIn: (email: string, pass: string) => Promise<void>;
@@ -24,106 +26,89 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<CognitoUser | null>(null);
   const [permissions, setPermissions] = useState<string[]>([]);
   const [canCreate, setCanCreate] = useState(false);
+const [userAttributes, setUserAttributes] = useState<any>(null);
+ 
 
-  // --- LÓGICA DE PERMISOS PARA LA PRUEBA ---
-  const extractPermissions = (session: CognitoUserSession) => {
-    console.log("IdToken:", session.getIdToken()?.getJwtToken());
-    console.log("AccessToken:", session.getAccessToken()?.getJwtToken());
-    console.log("RefreshToken:", session.getRefreshToken()?.getToken());
-  const idToken = session?.getIdToken();
-  if (!idToken || !idToken.getJwtToken()) {
-    console.warn("⚠️ IdToken no disponible o inválido");
-    setPermissions([]);
-    setCanCreate(false);
-    return null;
+
+const processSession = (session: CognitoUserSession) => {
+  try {
+    const idToken = session.getIdToken();
+    const payload = idToken.decodePayload();
+    
+    // Guardamos los atributos de una vez aquí
+    setUserAttributes(payload); 
+    setCanCreate(!!payload.sub);
+    setIsAuthenticated(true);
+  } catch (e) {
+    console.error("Error en processSession:", e);
   }
-
-  const payload: any = idToken.decodePayload();
-  const groups = payload['cognito:groups'] || [];
-
-  const hasActiveProfile = !!payload.sub;
-  setPermissions(groups);
-  setCanCreate(hasActiveProfile);
-  return payload;
 };
 
-
-// --- HIDRATACIÓN INICIAL ---
-  useEffect(() => {
-    const checkSession = async () => {
-      // 🛡️ SEGURO: Si después de 4 segundos no hay respuesta...
-      const forceStopLoading = setTimeout(() => {
-        // Usamos el estado anterior para verificar si sigue cargando
-        setIsLoading((loading) => {
-          if (loading) console.log("⏰ Tiempo de espera agotado para Cognito.");
-          return false;
-        });
-      }, 4000);
-
-      try {
-        const currentUser = userPool.getCurrentUser();
-        
-        if (currentUser) {
-       currentUser.getSession((err: any, session: CognitoUserSession | null) => {
-        clearTimeout(forceStopLoading);
-
-  if (err || !session || !session.isValid()) {
-    console.log("⚠️ Sesión inválida o error al recuperar la sesión", err);
-    setIsLoading(false);
-    return;
-  }
-
-  if (!session.getIdToken() || !session.getIdToken().getJwtToken()) {
-    console.log("⚠️ IdToken no disponible en la sesión");
-    setIsLoading(false);
-    return;
-  }
-
-  console.log("✅ Sesión recuperada con éxito para:", currentUser.getUsername());
-  extractPermissions(session);
-  setUser(currentUser);
-  setIsAuthenticated(true);
-  setIsLoading(false);
-});
-        } else {
-          console.log("ℹ️ No se encontró usuario persistido.");
-          clearTimeout(forceStopLoading);
-          setIsLoading(false);
-        }
-      } catch (error) {
-        clearTimeout(forceStopLoading);
-        console.error("💥 Error crítico:", error);
-        setIsLoading(false);
-      }
-    };
-
-    // 🚀 IMPORTANTE: Llamamos a la función
-    checkSession();
-  }, []);
-
-  // --- INICIO DE SESIÓN ---
-  const signIn = async (email: string, pass: string) => {
+useEffect(() => {
+  const initializeAuth = async () => {
     try {
-      setIsLoading(true);
-      const session: any = await authService.login(email, pass);
-      const payload = extractPermissions(session);
-      
-    const currentUser = new CognitoUser({
-  Username: email, 
-  Pool: userPool
-});
+      // 1. MANIOBRA SENIOR: Limpiamos llaves corruptas manualmente
+      const keys = await AsyncStorage.getAllKeys();
+      for (const key of keys) {
+        if (key.includes('lastUser') || key.includes('idToken')) {
+          const val = await AsyncStorage.getItem(key);
+          if (val === 'undefined' || val === null) {
+            await AsyncStorage.removeItem(key);
+          }
+        }
+      }
 
-      setUser(currentUser);
-      setIsAuthenticated(true);
-      
-      router.replace('/(tabs)');
-    } catch (error: any) {
-      alert("Error de acceso: " + error.message);
-    } finally {
+      const currentUser = userPool.getCurrentUser();
+      if (!currentUser) {
+        setIsLoading(false);
+        return;
+      }
+
+      // 2. En lugar de getSession directo, usamos este truco para evitar el crash
+      // Si el objeto interno jwtToken no existe, no llamamos a getSession
+      currentUser.getSession((err: any, session: any) => {
+        if (err || !session || !session.isValid()) {
+          setIsAuthenticated(false);
+        } else {
+          processSession(session);
+          setUser(currentUser);
+        }
+        setIsLoading(false);
+      });
+
+    } catch (error) {
+      // Si llega a explotar, forzamos el deslogueo para limpiar el estado
+      console.error("🔥 El SDK de AWS falló, limpiando...", error);
+      await AsyncStorage.clear(); 
       setIsLoading(false);
     }
   };
 
+  initializeAuth();
+}, []);
+
+  // --- INICIO DE SESIÓN ---
+
+
+const signIn = async (email: string, pass: string) => {
+    try {
+      setIsLoading(true);
+      const session = await authService.login(email, pass);
+      
+      // Procesamos los datos de la nueva sesión
+      processSession(session);
+      
+      // Importante: Volvemos a pedir el usuario al pool para que venga con el storage vinculado
+      const authenticatedUser = userPool.getCurrentUser();
+      setUser(authenticatedUser);
+      
+      router.replace('/(tabs)');
+    } catch (error: any) {
+      alert("Error: " + error.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
   // --- CERRAR SESIÓN ---
   const signOut = async () => {
     try {
@@ -143,7 +128,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       isAuthenticated, 
       isLoading, 
       user, 
-      permissions, // Ahora sí se pasan a la UI
+      permissions,
+      userAttributes, // Ahora sí se pasan a la UI
       canCreate,    // Ahora sí se pasan a la UI
       signIn, 
       signOut 
