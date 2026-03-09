@@ -53,8 +53,7 @@ Para facilitar la revisión, la aplicación ha sido compilada mediante **EAS Bui
 
 ---
 ## 🎥 Evidencia de Funcionamiento
-[AQUÍ INSERTA EL LINK A TU VIDEO DEMOSTRATIVO]
-
+(https://youtu.be/QI9m8CrxSoM)
 
 Aspectos clave de mi entrega:
 
