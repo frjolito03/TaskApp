@@ -42,7 +42,7 @@ export default function CreateTaskModal() {
 
     try {
       // 2. Extracción de Token para cumplimiento de "Autorización por Scopes"
-      // Según la prueba técnica, debemos demostrar que enviamos el Access Token
+      //  debemos demostrar que enviamos el Access Token
       const session = await fetchAuthSession();
       const accessToken = session.tokens?.accessToken?.toString();
 

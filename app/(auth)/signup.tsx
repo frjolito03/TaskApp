@@ -12,7 +12,7 @@ export default function SignUpScreen() {
   
   const router = useRouter();
 
-  // Tu lógica de validación (está perfecta, la mantenemos)
+  //  lógica de validación 
   const validations = {
     length: password.length >= 8,
     upper: /[A-Z]/.test(password),

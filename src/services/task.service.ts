@@ -27,7 +27,7 @@ export const taskService = {
     return allTasks.filter(t => t.userId === userId);
   },
 
-  // POST: Crear tarea VALIDANDO SCOPES (Punto clave de la prueba)
+  // POST: Crear tarea VALIDANDO SCOPES 
 saveTask: async (userId: string, title: string, accessToken: string): Promise<Task> => {
     const session = await fetchAuthSession();
     const token = session.tokens?.accessToken;

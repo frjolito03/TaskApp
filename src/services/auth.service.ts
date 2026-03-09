@@ -18,7 +18,7 @@ export const authService = {
     }
   },
 
-  // Para obtener los tokens y el payload (lo que antes era getSession)
+  // Para obtener los tokens y el payload 
   getSession: async () => {
     return await fetchAuthSession();
   }

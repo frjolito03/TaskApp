@@ -100,9 +100,6 @@ function RootLayoutNav() {
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(auth)" />
       <Stack.Screen name="(tabs)" />
-      {/* Mantenemos el modal aquí. Recuerda que para que funcione, 
-         el archivo debe estar en app/modal.tsx 
-      */}
       <Stack.Screen 
         name="modal" 
         options={{ 
