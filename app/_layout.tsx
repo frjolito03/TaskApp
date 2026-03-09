@@ -2,11 +2,29 @@ import { useFonts } from 'expo-font';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
+import 'react-native-get-random-values';
 import 'react-native-reanimated';
 
 import { View } from '@/components/Themed';
-import { AuthProvider, useAuth } from '@/src/context/AuthContext';
+import { AuthProvider, useAuth } from '../src/context/AuthContext';
+// --- 1. CONFIGURACIÓN DE AMPLIFY ---
+// Esto debe ejecutarse antes de que cualquier componente intente usar Auth
+import { Amplify } from 'aws-amplify';
 import { ActivityIndicator } from 'react-native';
+
+Amplify.configure({
+  Auth: {
+    Cognito: {
+      // El "!" le quita el error de 'undefined'
+      userPoolId: process.env.EXPO_PUBLIC_COGNITO_USER_POOL_ID!,
+      userPoolClientId: process.env.EXPO_PUBLIC_COGNITO_CLIENT_ID!,
+      signUpVerificationMethod: 'code',
+      loginWith: {
+        email: true,
+      }
+    }
+  }
+});
 
 export {
   ErrorBoundary
@@ -50,24 +68,19 @@ function RootLayoutNav() {
   const router = useRouter();
 
   useEffect(() => {
-    // 1. Si el AuthContext todavía está leyendo el storage, esperamos.
     if (isLoading) return;
 
-    // Determinamos si el usuario está en el grupo de rutas de autenticación
     const inAuthGroup = segments[0] === '(auth)';
 
     console.log(`🛡️ Guardia: Auth=${isAuthenticated} | EnAuthGroup=${inAuthGroup}`);
 
-    // Usamos setImmediate o un timeout de 0 para asegurar que el Router esté listo
     const timeout = setTimeout(() => {
       if (!isAuthenticated && !inAuthGroup) {
-        // Caso: No logueado intentando entrar a la App -> Login
-        console.log("🚫 Redirigiendo a Login...");
+        // No logueado -> Al Login
         router.replace('/(auth)/login');
       } 
       else if (isAuthenticated && inAuthGroup) {
-        // Caso: Logueado intentando ver el Login -> App
-        console.log("🚀 Redirigiendo a Tabs...");
+        // Logueado -> A la App
         router.replace('/(tabs)');
       }
     }, 0);
@@ -75,7 +88,6 @@ function RootLayoutNav() {
     return () => clearTimeout(timeout);
   }, [isAuthenticated, isLoading, segments]);
 
-  // 3. Pantalla de carga limpia
   if (isLoading) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }}>
@@ -88,7 +100,14 @@ function RootLayoutNav() {
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(auth)" />
       <Stack.Screen name="(tabs)" />
-      <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Nueva Tarea', headerShown: true }} />
+      <Stack.Screen 
+        name="modal" 
+        options={{ 
+          presentation: 'modal', 
+          headerShown: true, 
+          title: 'Nueva Tarea' 
+        }} 
+      />
     </Stack>
   );
 }

@@ -1,47 +1,79 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { fetchAuthSession } from 'aws-amplify/auth';
 
 export interface Task {
   id: string;
-  userId: string; // <--- AQUÍ VINCULAMOS AL USUARIO
   title: string;
+  userId: string;
   completed: boolean;
-  createdAt: number;
 }
 
-const TASKS_STORAGE_KEY = '@tasks_storage';
+const STORAGE_KEY = '@tasks_cache';
 
 export const taskService = {
-  // GET /tasks: Solo requiere estar autenticado
+  // GET: Obtener tareas con simulación de carga de red
   getTasks: async (userId: string): Promise<Task[]> => {
-    const jsonValue = await AsyncStorage.getItem(TASKS_STORAGE_KEY);
-    const allTasks: Task[] = jsonValue != null ? JSON.parse(jsonValue) : [];
-    return allTasks.filter(task => task.userId === userId);
+    // 1. Validamos sesión (Simula el paso por un API Gateway)
+    const session = await fetchAuthSession();
+    if (!session.tokens?.accessToken) throw new Error("No autorizado");
+    console.log("🔍 Buscando para ID:", userId);
+    console.log("LOG: Accediendo a tareas con Token:", session.tokens.accessToken.toString().slice(0, 20) + "...");
+
+    // 2. Intentamos cargar de caché local (Persistencia Offline requerida)
+    const stored = await AsyncStorage.getItem(STORAGE_KEY);
+    const allTasks: Task[] = stored ? JSON.parse(stored) : [];
+    
+    // Filtramos por el sub del usuario
+    return allTasks.filter(t => t.userId === userId);
   },
 
-  // POST /tasks: AQUÍ SIMULAMOS LA SEGURIDAD DEL SCOPE
-  saveTask: async (userId: string, title: string, accessToken: string): Promise<Task> => {
-    
-    // SIMULACIÓN DE API GATEWAY / AUTHORIZER
-    // En la vida real, el backend decodifica el JWT y revisa el campo 'scope'
-    const hasWriteScope = accessToken.includes('tasks:write') || accessToken === 'mock-admin-token';
+  // POST: Crear tarea VALIDANDO SCOPES 
+saveTask: async (userId: string, title: string, accessToken: string): Promise<Task> => {
+    const session = await fetchAuthSession();
+    const token = session.tokens?.accessToken;
+    console.log("🛡️ Validando con token:", accessToken.slice(-10));
+    // Simulación de validación de Scopes
+    const scopes = token?.payload['scope']?.toString() || "";
+    // El scope por defecto de Cognito suele permitir acciones de usuario
+    const hasPermission = scopes.includes('tasks:write') || scopes.includes('aws.cognito.signin.user.admin');
 
-    if (!hasWriteScope) {
-      throw new Error("403 Forbidden: No tienes el scope tasks:write");
+    if (!hasPermission) {
+      throw new Error("403: Forbidden - No tienes el scope tasks:write");
     }
 
     const newTask: Task = {
-      id: Date.now().toString(),
-      userId,
+      id: Math.random().toString(36).substring(7),
       title,
-      completed: false,
-      createdAt: Date.now()
+      userId,
+      completed: false
     };
 
-    const jsonValue = await AsyncStorage.getItem(TASKS_STORAGE_KEY);
-    const allTasks = jsonValue != null ? JSON.parse(jsonValue) : [];
+    // Guardar en persistencia
+    const stored = await AsyncStorage.getItem(STORAGE_KEY);
+    const allTasks = stored ? JSON.parse(stored) : [];
+    console.log("💾 Guardando para ID:", userId);
     allTasks.push(newTask);
-    await AsyncStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(allTasks));
-    
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(allTasks));
+
     return newTask;
+  },
+
+  deleteTask: async (taskId: string): Promise<void> => {
+    try {
+      const stored = await AsyncStorage.getItem(STORAGE_KEY);
+      if (!stored) return;
+
+      const allTasks: Task[] = JSON.parse(stored);
+      // Filtramos para quitar la tarea que coincida con el ID
+      const updatedTasks = allTasks.filter(t => t.id !== taskId);
+      
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updatedTasks));
+      console.log(`🗑️ [AuthZ] Tarea ${taskId} eliminada de la persistencia.`);
+    } catch (error) {
+      console.error("Error al eliminar tarea:", error);
+      throw error;
+    }
   }
+
+  
 };

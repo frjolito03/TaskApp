@@ -1,31 +1,40 @@
-import { useColorScheme } from '@/components/useColorScheme'; // Importamos el hook de tema
-import { useAuth } from '@/src/context/AuthContext';
-import { Ionicons } from '@expo/vector-icons'; // Para el icono del ojo
+import { useColorScheme } from '@/components/useColorScheme';
+import { Ionicons } from '@expo/vector-icons';
 import { Link } from 'expo-router';
 import React, { useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useAuth } from '../../src/context/AuthContext'; // <--- IMPORTANTE: Usamos TU contexto
 
 export default function LoginScreen() {
-  const { signIn } = useAuth();
-  const colorScheme = useColorScheme(); // Detecta si es 'light' o 'dark'
+  const { signIn } = useAuth(); // <--- Ahora sí, sacamos la acción del contexto
+  const colorScheme = useColorScheme();
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // Colores dinámicos para evitar que el texto "desaparezca" en modo oscuro
+  // Estilos dinámicos para Dark Mode
   const textColor = colorScheme === 'dark' ? '#FFFFFF' : '#000000';
   const inputBg = colorScheme === 'dark' ? '#2C2C2E' : '#F2F2F7';
   const placeholderColor = colorScheme === 'dark' ? '#8E8E93' : '#A9A9A9';
 
   const handleLogin = async () => {
+    if (!email || !password) {
+      Alert.alert("Campos incompletos", "Por favor, ingresa tu correo y contraseña.");
+      return;
+    }
+
     setLoading(true);
     try {
-      // Usamos tus credenciales: sosacarlos200@gmail.com / TaskApp2026!#
-      await signIn(email, password);
-    } catch (error) {
-      alert("Error de autenticación: Verifique sus credenciales");
+      // Llamamos al signIn del contexto. 
+      // Este por dentro usa Amplify y luego hace el router.replace('/(tabs)')
+      await signIn(email.trim(), password);
+      console.log("✅ Sesión iniciada correctamente");
+    } catch (error: any) {
+      console.error("❌ Error en LoginScreen:", error);
+      // El alert ahora es más limpio
+      Alert.alert("Error de Acceso", "Correo o contraseña incorrectos. Intenta de nuevo.");
     } finally {
       setLoading(false);
     }
@@ -33,86 +42,102 @@ export default function LoginScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF' }]}>
-      <Text style={[styles.title, { color: textColor }]}>Bienvenido a TaskApp</Text>
-
-      <TextInput
-        style={[styles.input, { backgroundColor: inputBg, color: textColor }]}
-        placeholder="Correo electrónico"
-        placeholderTextColor={placeholderColor}
-        value={email}
-        onChangeText={setEmail}
-        autoCapitalize="none"
-        keyboardType="email-address"
-      />
-
-      <View style={[styles.passwordContainer, { backgroundColor: inputBg }]}>
-        <TextInput
-          style={[styles.passwordInput, { color: textColor }]}
-          placeholder="Contraseña"
-          placeholderTextColor={placeholderColor}
-          secureTextEntry={!isPasswordVisible} // Lógica de visibilidad
-          value={password}
-          onChangeText={setPassword}
-        />
-        <Pressable 
-          onPress={() => setIsPasswordVisible(!isPasswordVisible)}
-          style={styles.eyeIcon}
-        >
-          <Ionicons 
-            name={isPasswordVisible ? "eye-off" : "eye"} 
-            size={24} 
-            color={placeholderColor} 
-          />
-        </Pressable>
+      <View style={styles.header}>
+        <Text style={[styles.title, { color: textColor }]}>Bienvenido a TaskApp</Text>
+        <Text style={[styles.subtitle, { color: placeholderColor }]}>Gestiona tus proyectos de forma eficiente</Text>
       </View>
 
-      <Pressable 
-        style={styles.button} 
-        onPress={handleLogin}
-        disabled={loading}
-      >
-        {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>INICIAR SESIÓN</Text>}
-      </Pressable>
+      <View style={styles.form}>
+        <Text style={[styles.label, { color: textColor }]}>Correo Electrónico</Text>
+        <TextInput
+          style={[styles.input, { backgroundColor: inputBg, color: textColor }]}
+          placeholder="ejemplo@correo.com"
+          placeholderTextColor={placeholderColor}
+          value={email}
+          onChangeText={setEmail}
+          autoCapitalize="none"
+          keyboardType="email-address"
+        />
+
+        <Text style={[styles.label, { color: textColor }]}>Contraseña</Text>
+        <View style={[styles.passwordContainer, { backgroundColor: inputBg }]}>
+          <TextInput
+            style={[styles.passwordInput, { color: textColor }]}
+            placeholder="••••••••"
+            placeholderTextColor={placeholderColor}
+            secureTextEntry={!isPasswordVisible}
+            value={password}
+            onChangeText={setPassword}
+          />
+          <Pressable 
+            onPress={() => setIsPasswordVisible(!isPasswordVisible)}
+            style={styles.eyeIcon}
+          >
+            <Ionicons 
+              name={isPasswordVisible ? "eye-off" : "eye"} 
+              size={22} 
+              color={placeholderColor} 
+            />
+          </Pressable>
+        </View>
+
+        <TouchableOpacity 
+          style={[styles.button, { opacity: loading ? 0.7 : 1 }]} 
+          onPress={handleLogin}
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.buttonText}>INICIAR SESIÓN</Text>
+          )}
+        </TouchableOpacity>
+
+             <Link href="/(auth)/forgot-password" asChild>
+          <TouchableOpacity style={styles.forgotPasswordContainer}>
+            <Text style={styles.forgotPasswordText}>¿Olvidaste tu contraseña?</Text>
+          </TouchableOpacity>
+        </Link>
+      
+      </View>
 
       <View style={styles.footer}>
-  <Text style={styles.footerText}>¿No tienes una cuenta? </Text>
-  
-  {/* El href debe coincidir con el nombre del archivo dentro de (auth) */}
-  <Link href="/(auth)/signup" asChild>
-    <TouchableOpacity>
-      <Text style={styles.linkText}>Regístrate aquí</Text>
-    </TouchableOpacity>
-  </Link>
-</View>
+        <Text style={[styles.footerText, { color: placeholderColor }]}>¿No tienes una cuenta?</Text>
+        <Link href="/(auth)/signup" asChild>
+          <TouchableOpacity>
+            <Text style={styles.linkText}> Regístrate aquí</Text>
+          </TouchableOpacity>
+        </Link>
+
+   
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', padding: 20 },
-  title: { fontSize: 28, fontWeight: 'bold', marginBottom: 30, textAlign: 'center' },
-  input: { height: 55, borderRadius: 10, paddingHorizontal: 15, marginBottom: 15, fontSize: 16 },
-  passwordContainer: { flexDirection: 'row', alignItems: 'center', borderRadius: 10, marginBottom: 25 },
+  container: { flex: 1, padding: 25, justifyContent: 'center' },
+  header: { marginBottom: 40 },
+  title: { fontSize: 32, fontWeight: '800', marginBottom: 10 },
+  subtitle: { fontSize: 16, lineHeight: 22 },
+  form: { width: '100%' },
+  label: { fontSize: 14, fontWeight: '600', marginBottom: 8, marginLeft: 4 },
+  input: { height: 55, borderRadius: 12, paddingHorizontal: 15, marginBottom: 20, fontSize: 16 },
+  passwordContainer: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, marginBottom: 30 },
   passwordInput: { flex: 1, height: 55, paddingHorizontal: 15, fontSize: 16 },
-  eyeIcon: { padding: 10 },
-  button: { backgroundColor: '#007AFF', height: 55, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
-  buttonText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
+  eyeIcon: { paddingRight: 15 },
+  button: { backgroundColor: '#007AFF', height: 58, borderRadius: 14, justifyContent: 'center', alignItems: 'center', elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4 },
+  buttonText: { color: '#fff', fontSize: 17, fontWeight: 'bold', letterSpacing: 0.5 },
+  footer: { flexDirection: 'row', justifyContent: 'center', marginTop: 40 },
+  footerText: { fontSize: 15 },
+  linkText: { fontSize: 15, color: '#007AFF', fontWeight: '700' },
+forgotPasswordContainer: {
+    marginTop: 20,     
     alignItems: 'center',
-    marginTop: 30,
-    paddingVertical: 10,
   },
-  footerText: {
-    fontSize: 15,
-    color: '#666', 
-  },
-  linkText: {
+  forgotPasswordText: {
     fontSize: 15,
     color: '#007AFF',
-    fontWeight: 'bold',
-    paddingHorizontal: 5, 
-    paddingVertical: 10,   
+    fontWeight: '600',
   },
 });

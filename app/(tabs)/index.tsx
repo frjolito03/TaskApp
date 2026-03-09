@@ -1,71 +1,87 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 // Servicios y Contexto
-import { Task, taskService } from '@/src/services/task.service';
+import { Alert } from 'react-native';
 import { useAuth } from '../../src/context/AuthContext';
+import { Task, taskService } from '../../src/services/task.service';
 
 export default function TasksScreen() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
-  
-  // Fuente de verdad del contexto
-  const { user, canCreate } = useAuth(); 
+  // Ahora usamos userAttributes. El "user" viejo ya no es necesario aquí.
+  const { userAttributes, isAuthenticated } = useAuth(); 
 
-const loadData = useCallback(async () => {
-  if (!user) return;
+const loadTasks = async () => {
+    // Si no hay sub, no podemos filtrar. Salimos pero apagamos el loading.
+    if (!userAttributes?.sub) {
+      setLoading(false);
+      return;
+    }
 
-  setLoading(true);
-  try {
-    user.getSession(async (err: any, session: any) => {
-      if (err || !session || !session.isValid()) {
-        console.log("⚠️ Sesión no lista para cargar datos");
-        setLoading(false);
-        return; 
+    setLoading(true);
+    try {
+      const data = await taskService.getTasks(userAttributes.sub);
+      setTasks(data);
+    } catch (error) {
+      console.error("Error cargando tareas:", error);
+      Alert.alert("Error", "No se pudieron cargar las tareas");
+    } finally {
+      // ESTO FALTABA: Apagar el loading siempre [cite: 25, 45]
+      setLoading(false); 
+    }
+  };
+const handleDelete = (taskId: string) => {
+  Alert.alert(
+    "Eliminar Tarea",
+    "¿Estás seguro de que quieres borrar esta tarea?",
+    [
+      { text: "Cancelar", style: "cancel" },
+      { 
+        text: "Eliminar", 
+        style: "destructive", 
+        onPress: async () => {
+          try {
+            await taskService.deleteTask(taskId);
+            // Refrescamos la lista localmente para que desaparezca de inmediato
+            setTasks(prev => prev.filter(t => t.id !== taskId));
+          } catch (error) {
+            Alert.alert("Error", "No se pudo eliminar la tarea.");
+          }
+        } 
       }
-
-      try {
-        // EXTRA: Obtenemos el ID real del token para mayor seguridad en la prueba
-        const payload = session.getIdToken().decodePayload();
-        const userId = payload.sub; // Este es el UUID único de AWS
-
-        console.log("Cargando tareas para el usuario:", userId);
-        
-        // Usamos el userId (sub) en lugar de getUsername si tu API así lo requiere
-        const data = await taskService.getTasks(userId); 
-        setTasks(data);
-      } catch (error) {
-        console.error("Error al obtener tareas:", error);
-      } finally {
-        setLoading(false);
-      }
-    });
-  } catch (error) {
-    setLoading(false);
-  }
-}, [user]);
-
-  // Ejecución inicial
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
-
-  const renderTask = ({ item }: { item: Task }) => (
-    <View style={styles.taskItem}>
-      <View style={{ flex: 1 }}>
-        <Text style={[styles.taskText, item.completed && styles.completedText]}>
-          {item.title}
-        </Text>
-        <Text style={styles.userIdTag}>ID: {item.userId.slice(0, 8)}...</Text>
-      </View>
-      {item.completed && (
-        <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
-      )}
-    </View>
+    ]
   );
+};
+useFocusEffect(
+    useCallback(() => {
+      loadTasks();
+    }, [userAttributes?.sub])
+  )
+
+const renderTask = ({ item }: { item: Task }) => (
+  <View style={styles.taskItem}>
+    <View style={{ flex: 1 }}>
+      <Text style={[styles.taskText, item.completed && styles.completedText]}>
+        {item.title}
+      </Text>
+      <Text style={styles.userIdTag}>ID: {item.id.slice(0, 5)}...</Text>
+    </View>
+    
+    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+      {item.completed && (
+        <Ionicons name="checkmark-circle" size={22} color="#4CAF50" style={{ marginRight: 10 }} />
+      )}
+      
+      <TouchableOpacity onPress={() => handleDelete(item.id)}>
+        <Ionicons name="trash-outline" size={22} color="#FF3B30" />
+      </TouchableOpacity>
+    </View>
+  </View>
+);
 
   return (
     <View style={styles.container}>
@@ -80,11 +96,15 @@ const loadData = useCallback(async () => {
           renderItem={renderTask}
           ListEmptyComponent={<Text style={styles.emptyText}>No tienes tareas aún.</Text>}
           contentContainerStyle={styles.listContent}
+          // Agregamos un refresco manual por si acaso
+          onRefresh={loadTasks}
+          refreshing={loading}
         />
       )}
 
-      {/* Acción de creación basada en permisos del contexto */}
-      {canCreate && (
+      {/* El botón flotante ahora siempre visible si estás logueado, 
+          o puedes usar una lógica de roles si la tienes */}
+      {isAuthenticated && (
         <TouchableOpacity 
           style={styles.fab} 
           onPress={() => router.push('/modal')} 

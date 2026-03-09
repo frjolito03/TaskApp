@@ -1,7 +1,7 @@
+import { confirmSignUp, signUp } from 'aws-amplify/auth'; // Importamos directo de Amplify
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { ActivityIndicator, Alert, Button, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { authService } from '../../src/services/auth.service';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 export default function SignUpScreen() {
   const [email, setEmail] = useState('');
@@ -12,8 +12,8 @@ export default function SignUpScreen() {
   
   const router = useRouter();
 
-  // Paso 1: Registro Inicial
-const validations = {
+  //  lógica de validación 
+  const validations = {
     length: password.length >= 8,
     upper: /[A-Z]/.test(password),
     lower: /[a-z]/.test(password),
@@ -23,33 +23,54 @@ const validations = {
 
   const isPasswordValid = Object.values(validations).every(v => v);
 
+  // PASO 1: Registro con Amplify
   const handleSignUp = async () => {
     if (!isPasswordValid) {
-      return Alert.alert("Password débil", "Asegúrate de cumplir con todos los requisitos de seguridad.");
+      return Alert.alert("Seguridad", "La contraseña no cumple los requisitos.");
     }
 
     setLoading(true);
     try {
-      await authService.signUp(email, password);
-      setIsPendingConfirmation(true); 
-      Alert.alert("Éxito", "Código enviado a tu email.");
+      // En Amplify v6 se pasa un objeto con username, password y opcionalmente attributes
+      const { isSignUpComplete, nextStep } = await signUp({
+        username: email.trim(),
+        password,
+        options: {
+          userAttributes: {
+            email: email.trim(),
+          }
+        }
+      });
+
+      // Si el siguiente paso es confirmar el email, mostramos el campo del código
+      if (nextStep.signUpStep === 'CONFIRM_SIGN_UP') {
+        setIsPendingConfirmation(true);
+        Alert.alert("Verificación", "Se ha enviado un código a tu correo.");
+      }
     } catch (error: any) {
-      Alert.alert("Error", error.message);
+      console.error("Error en SignUp:", error);
+      Alert.alert("Error de registro", error.message || "No se pudo crear la cuenta");
     } finally {
       setLoading(false);
     }
   };
 
-  // Paso 2: Confirmación del Código (Requerido por Cognito)
+  // PASO 2: Confirmación del Código
   const handleConfirm = async () => {
     if (!code) return Alert.alert("Error", "Ingresa el código de 6 dígitos");
 
     setLoading(true);
     try {
-      await authService.confirmSignUp(email, code);
-      Alert.alert("¡Éxito!", "Cuenta confirmada. Ya puedes iniciar sesión.", [
-        { text: "Ir al Login", onPress: () => router.replace('/(auth)/login') }
-      ]);
+      const { isSignUpComplete } = await confirmSignUp({
+        username: email.trim(),
+        confirmationCode: code
+      });
+
+      if (isSignUpComplete) {
+        Alert.alert("¡Éxito!", "Cuenta confirmada correctamente.", [
+          { text: "Ir al Login", onPress: () => router.replace('/(auth)/login') }
+        ]);
+      }
     } catch (error: any) {
       Alert.alert("Error de validación", error.message || "Código incorrecto");
     } finally {
@@ -58,13 +79,12 @@ const validations = {
   };
 
   return (
-    <View style={styles.container}>
+    <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>
-        {isPendingConfirmation ? "Confirma tu cuenta" : "Crear nueva cuenta"}
+        {isPendingConfirmation ? "Verifica tu Email" : "Únete a TaskApp"}
       </Text>
 
       {!isPendingConfirmation ? (
-        // FORMULARIO DE REGISTRO
         <>
           <TextInput 
             placeholder="Correo electrónico" 
@@ -81,54 +101,75 @@ const validations = {
           />
 
           <View style={styles.validationBox}>
-            <Text style={styles.validationTitle}>Requisitos de seguridad:</Text>
-            <Text style={validations.length ? styles.valid : styles.invalid}>✓ Mínimo 8 caracteres</Text>
-            <Text style={validations.upper ? styles.valid : styles.invalid}>✓ Al menos una Mayúscula</Text>
-            <Text style={validations.number ? styles.valid : styles.invalid}>✓ Al menos un Número</Text>
-            <Text style={validations.special ? styles.valid : styles.invalid}>✓ Al menos un Carácter especial (@, #, !)</Text>
+            <Text style={styles.validationTitle}>Requisitos mínimos:</Text>
+            <Text style={validations.length ? styles.valid : styles.invalid}>
+              {validations.length ? '●' : '○'} 8 caracteres
+            </Text>
+            <Text style={validations.upper ? styles.valid : styles.invalid}>
+              {validations.upper ? '●' : '○'} Una Mayúscula
+            </Text>
+            <Text style={validations.number ? styles.valid : styles.invalid}>
+              {validations.number ? '●' : '○'} Un Número
+            </Text>
+            <Text style={validations.special ? styles.valid : styles.invalid}>
+              {validations.special ? '●' : '○'} Carácter especial (@, #, !)
+            </Text>
           </View>
           
           {loading ? (
-            <ActivityIndicator size="large" color="#0000ff" />
+            <ActivityIndicator size="large" color="#007AFF" />
           ) : (
-            <Button title="Registrarse" onPress={handleSignUp} />
+            <TouchableOpacity 
+              style={[styles.mainButton, !isPasswordValid && { backgroundColor: '#ccc' }]} 
+              onPress={handleSignUp}
+              disabled={!isPasswordValid}
+            >
+              <Text style={styles.buttonText}>REGISTRARSE</Text>
+            </TouchableOpacity>
           )}
         </>
       ) : (
-        // FORMULARIO DE CÓDIGO DE VERIFICACIÓN
         <>
-          <Text style={styles.infoText}>Ingresa el código enviado a: {email}</Text>
+          <Text style={styles.infoText}>Ingresa el código enviado a:{"\n"}{email}</Text>
           <TextInput 
-            placeholder="Código de 6 dígitos" 
-            style={styles.input} 
+            placeholder="000000" 
+            style={styles.inputCode} 
             onChangeText={setCode} 
             keyboardType="number-pad"
+            maxLength={6}
           />
           {loading ? (
-            <ActivityIndicator size="large" color="#0000ff" />
+            <ActivityIndicator size="large" color="#28a745" />
           ) : (
-            <Button title="Confirmar Código" onPress={handleConfirm} color="#28a745" />
+            <TouchableOpacity style={[styles.mainButton, { backgroundColor: '#28a745' }]} onPress={handleConfirm}>
+              <Text style={styles.buttonText}>CONFIRMAR CUENTA</Text>
+            </TouchableOpacity>
           )}
-          <Button title="Volver al registro" onPress={() => setIsPendingConfirmation(false)} color="#6c757d" />
+          <Pressable onPress={() => setIsPendingConfirmation(false)} style={{ marginTop: 20 }}>
+            <Text style={{ color: '#666', textAlign: 'center' }}>Corregir correo electrónico</Text>
+          </Pressable>
         </>
       )}
 
       <Pressable onPress={() => router.push('/(auth)/login')} style={styles.link}>
         <Text style={styles.linkText}>¿Ya tienes cuenta? Inicia sesión</Text>
       </Pressable>
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', padding: 25, backgroundColor: '#fff' },
-  title: { fontSize: 26, fontWeight: 'bold', marginBottom: 20, textAlign: 'center' },
-  input: { borderBottomWidth: 1, borderColor: '#ddd', marginBottom: 20, padding: 10, fontSize: 16 },
-  infoText: { marginBottom: 15, textAlign: 'center', color: '#666' },
-  link: { marginTop: 25, alignItems: 'center' },
-  linkText: { color: '#007AFF', fontSize: 16 },
-  validationBox: { backgroundColor: '#f8f9fa', padding: 15, borderRadius: 8, marginBottom: 20 },
-  validationTitle: { fontWeight: 'bold', marginBottom: 5, fontSize: 13 },
-  valid: { color: 'green', fontSize: 12 },
-  invalid: { color: '#dc3545', fontSize: 12 },
+  container: { flexGrow: 1, justifyContent: 'center', padding: 25, backgroundColor: '#fff' },
+  title: { fontSize: 28, fontWeight: 'bold', marginBottom: 30, textAlign: 'center', color: '#1C1C1E' },
+  input: { borderBottomWidth: 1, borderColor: '#ddd', marginBottom: 20, padding: 12, fontSize: 16 },
+  inputCode: { borderBottomWidth: 2, borderColor: '#28a745', marginBottom: 30, padding: 10, fontSize: 24, textAlign: 'center', letterSpacing: 10 },
+  infoText: { marginBottom: 25, textAlign: 'center', color: '#666', lineHeight: 20 },
+  link: { marginTop: 30, alignItems: 'center' },
+  linkText: { color: '#007AFF', fontSize: 16, fontWeight: '600' },
+  validationBox: { backgroundColor: '#F2F2F7', padding: 15, borderRadius: 12, marginBottom: 25 },
+  validationTitle: { fontWeight: 'bold', marginBottom: 8, fontSize: 14 },
+  valid: { color: '#34C759', fontSize: 13, marginBottom: 2 },
+  invalid: { color: '#FF3B30', fontSize: 13, marginBottom: 2 },
+  mainButton: { backgroundColor: '#007AFF', height: 55, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+  buttonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' }
 });
