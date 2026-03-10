@@ -12,7 +12,6 @@ export default function TasksScreen() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
-  // Ahora usamos userAttributes. El "user" viejo ya no es necesario aquí.
   const { userAttributes, isAuthenticated } = useAuth(); 
 
 const loadTasks = async () => {
@@ -30,7 +29,7 @@ const loadTasks = async () => {
       console.error("Error cargando tareas:", error);
       Alert.alert("Error", "No se pudieron cargar las tareas");
     } finally {
-      // ESTO FALTABA: Apagar el loading siempre [cite: 25, 45]
+     
       setLoading(false); 
     }
   };

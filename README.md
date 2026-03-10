@@ -3,15 +3,7 @@
 ## 📌 Descripción del Proyecto
 TaskApp es una aplicación móvil de alto rendimiento desarrollada con **React Native** y **Expo**. La solución se enfoca en la gestión eficiente de tareas, integrando seguridad de nivel empresarial con **AWS Amplify v6** y una arquitectura de persistencia local para garantizar la disponibilidad de datos en entornos sin conexión.
 
----
-### 🖥️ Vista Previa de la Aplicación
 
-| Pantalla de Autenticación | Flujo Principal (CRUD) | Gestión de Tareas (Datos) |
-| :---: | :---: | :---: |
-| <img src="path/to/tu_imagen_login.png" width="250" alt="Pantalla de Login de TaskApp"> | <img src="path/to/tu_imagen_empty_tasks.png" width="250" alt="Lista de tareas vacía"> | <img src="path/to/tu_imagen_tasks_data.png" width="250" alt="Lista de tareas con datos"> |
-| *Validación reactiva de seguridad y hosted UI de Cognito.* | *UI optimizada para el flujo de trabajo del usuario (Offline-First).* | *CRUD completo con segmentación de datos por usuario (`sub`).* |
-
----
 
 ## 🛠️ Stack Tecnológico y Versiones
 Para este proyecto se utilizaron las versiones más recientes del ecosistema para asegurar compatibilidad y seguridad:

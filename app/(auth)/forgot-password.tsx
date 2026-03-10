@@ -26,6 +26,7 @@ export default function ForgotPasswordScreen() {
     if (!email) return Alert.alert("Error", "Ingresa tu correo electrónico");
     setLoading(true);
     try {
+      // 3. RE-CONFIGURACIÓN SILENCIOSA (Vital para la APK)
       await resetPassword({ username: email });
       setStep(2);
       Alert.alert("Código enviado", "Revisa tu bandeja de entrada.");

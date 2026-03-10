@@ -1,30 +1,34 @@
+// --- 1. CONFIGURACIÓN DE AMPLIFY ---
+import { Amplify } from 'aws-amplify';
 import { useFonts } from 'expo-font';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import 'react-native-get-random-values';
 import 'react-native-reanimated';
+import awsconfig from '../aws-exports';
+Amplify.configure(awsconfig);
 
 import { View } from '@/components/Themed';
 import { AuthProvider, useAuth } from '../src/context/AuthContext';
 // --- 1. CONFIGURACIÓN DE AMPLIFY ---
 // Esto debe ejecutarse antes de que cualquier componente intente usar Auth
-import { Amplify } from 'aws-amplify';
+
 import { ActivityIndicator } from 'react-native';
 
-Amplify.configure({
-  Auth: {
-    Cognito: {
+//Amplify.configure({
+//  Auth: {
+   // Cognito: {
       // El "!" le quita el error de 'undefined'
-      userPoolId: process.env.EXPO_PUBLIC_COGNITO_USER_POOL_ID!,
-      userPoolClientId: process.env.EXPO_PUBLIC_COGNITO_CLIENT_ID!,
-      signUpVerificationMethod: 'code',
-      loginWith: {
-        email: true,
-      }
-    }
-  }
-});
+   //   userPoolId: process.env.EXPO_PUBLIC_COGNITO_USER_POOL_ID!,
+   //   userPoolClientId: process.env.EXPO_PUBLIC_COGNITO_CLIENT_ID!,
+   //   signUpVerificationMethod: 'code',
+    //  loginWith: {
+     //   email: true,
+     // }
+  //  }
+//  }
+//});
 
 export {
   ErrorBoundary

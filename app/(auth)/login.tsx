@@ -3,10 +3,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { Link } from 'expo-router';
 import React, { useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { useAuth } from '../../src/context/AuthContext'; // <--- IMPORTANTE: Usamos TU contexto
+import { useAuth } from '../../src/context/AuthContext';
 
 export default function LoginScreen() {
-  const { signIn } = useAuth(); // <--- Ahora sí, sacamos la acción del contexto
+  const { signIn } = useAuth(); 
   const colorScheme = useColorScheme();
   
   const [email, setEmail] = useState('');
